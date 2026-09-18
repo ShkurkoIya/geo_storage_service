@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: geo_storage_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: super_secret_password_2026
+      POSTGRES_DB: sarala_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_geo_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  pg_geo_data:
