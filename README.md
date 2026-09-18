@@ -1,1 +1,1 @@
-# geo_storage_service
+# Geo Storage for spatial data
