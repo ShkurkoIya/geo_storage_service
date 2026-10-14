@@ -1,16 +1,51 @@
+version: '3.8'
+
+x-base-service: &base-service
+  networks:
+    - geo-network
+  restart: unless-stopped
+
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: geo_storage_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: super_secret_password_2026
-      POSTGRES_DB: sarala_db
+  geo-service:
+    <<: *base-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geo_storage_service_container
     ports:
-      - "5432:5432"
+      - "3000:3000"
+    environment:
+      - RUST_LOG={RUST_LOG}
+      - SERVER_ADDRESS=${SERVER_ADDRESS}
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@geo-db:${POSTGRES_INTERNAL_PORT}/${POSTGRES_DB}
+      - DATABASE_MAX_CONNECTIONS=${DATABASE_MAX_CONNECTIONS}
+    depends_on:
+      geo-db:
+        condition: service_healthy
+    restart: always
+
+  geo-db:
+    <<: *base-service
+    image: postgis/postgis:16-3.4-alpine
+    container_name: geo_db_container
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}"
     volumes:
       - pg_geo_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
     restart: always
+
+networks:
+  geo-network:
+    driver: bridge
 
 volumes:
   pg_geo_data:

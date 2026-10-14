@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO reference_geo.lost_nodes (\n                id, node_index, name, accuracy_class, map_sheet_50k, map_sheet_200k, height_determination_method, monument_mark,\n                center_structure_type, surface_monument_type, monument_height_m, region_code, region_name, district_name,\n                condition_monument, condition_center, verification_year, latitude_raw, longitude_raw, geom_global, geom_local\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,\n                    ST_SetSRID(ST_MakePoint($19, $18, $11), 4326),\n                    ST_Transform(ST_SetSRID(ST_MakePoint($19, $18, $11), 4326), 28415))\n            ON CONFLICT (id) DO NOTHING;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Float8",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c10b3b47ab477cc4b8f771e05e67071a189f00ea6ac8c56d7da28bb0f99e66ff"
+}

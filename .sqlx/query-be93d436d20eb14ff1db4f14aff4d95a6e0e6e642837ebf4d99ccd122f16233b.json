@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO reference_geo.niveler_nodes (id, node_index, name, region_name, district_name, latitude_raw, longitude_raw, geom_global, geom_local)\n            VALUES ($1, $2, $3, $4, $5, $6, $7,\n                    ST_SetSRID(ST_MakePoint($7, $6, 0.0), 4326),\n                    ST_Transform(ST_SetSRID(ST_MakePoint($7, $6, 0.0), 4326), 3857))\n            ON CONFLICT (id) DO NOTHING;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be93d436d20eb14ff1db4f14aff4d95a6e0e6e642837ebf4d99ccd122f16233b"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO core_storage.deposits (id, name, polygon_boundary)\n            VALUES ($1, $2, CASE WHEN $3::text IS NOT NULL THEN ST_GeomFromText($3, 4326) ELSE NULL END)\n            ON CONFLICT (name) DO UPDATE SET polygon_boundary = EXCLUDED.polygon_boundary;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4d91e1f7f062ab6a82fbc75ae59cce27b1fd00dc8737c77eeaabbd86498e506c"
+}

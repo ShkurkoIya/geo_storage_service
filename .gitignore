@@ -1,0 +1,5 @@
+.zed
+.vscode
+data/*json
+target/
+.env

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO sandbox_simulation.synthetic_voxels (\n                id, body_id, voxel_east, voxel_north, voxel_elevation, voxel_size_m, grade_au, gkz_category, geom_cube\n            )\n            VALUES (\n                $1, $2, $3, $4, $5, $6, $7, $8,\n                -- 🚀 ЯВНОЕ ПРИВЕДЕНИЕ ТИПОВ: Подсказываем sqlx, что мы вычитаем FLOAT8!\n                ST_Force3D(\n                    ST_SetSRID(\n                        ST_MakeEnvelope(\n                            ($3::float8 - $9::float8),\n                            ($4::float8 - $9::float8),\n                            ($3::float8 + $9::float8),\n                            ($4::float8 + $9::float8)\n                        ),\n                        4326\n                    )\n                )\n            )\n            ON CONFLICT (id) DO NOTHING;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Varchar",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a0827eaef8415f02c900d4fe8a9e0b23f3cfc62cc5859f0cf6260bb80d921a98"
+}

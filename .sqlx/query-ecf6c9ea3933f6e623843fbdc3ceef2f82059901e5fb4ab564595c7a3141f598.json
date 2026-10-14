@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n              INSERT INTO core_storage.drillhole_intervals (id, collar_id, sample_id, depth_from, depth_to, thickness, quality_attributes, geom_poly)\n              VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)\n              ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ecf6c9ea3933f6e623843fbdc3ceef2f82059901e5fb4ab564595c7a3141f598"
+}

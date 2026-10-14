@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO core_storage.geological_blocks (\n                id, deposit_id, block_code, ore_body_name, horizon_elevation, resource_category,\n                area_m2, thickness_m, volume_m3, ore_tonnage, dip_angle, grade_and_economics_attributes, geom_poly\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,\n                    CASE WHEN $13::text IS NOT NULL THEN ST_GeomFromText($13, 4326) ELSE NULL END)\n            ON CONFLICT (deposit_id, block_code, ore_body_name) DO NOTHING;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Float8",
+        "Varchar",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c66e42e52c9340b9a30873841cab0d3030d909281b5942578d422f0d7fb2d7e6"
+}

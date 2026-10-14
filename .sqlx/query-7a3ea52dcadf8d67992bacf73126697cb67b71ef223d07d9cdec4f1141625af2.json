@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO core_storage.data_sources (id, deposit_id, file_name, sha256, deposit_name, geological_year, status, ai_passport)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ON CONFLICT (sha256) DO UPDATE SET status = $7, ai_passport = $8;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7a3ea52dcadf8d67992bacf73126697cb67b71ef223d07d9cdec4f1141625af2"
+}

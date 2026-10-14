@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO reference_geo.chemical_elements (code, display_name, measurement_unit, display_color)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (code) DO UPDATE\n            SET display_name = EXCLUDED.display_name,\n                measurement_unit = EXCLUDED.measurement_unit,\n                display_color = EXCLUDED.display_color;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e6487bb6e186f8731b4bc7f1bd9a751f68cf606c418bdc82f32fbc2963f12ee2"
+}

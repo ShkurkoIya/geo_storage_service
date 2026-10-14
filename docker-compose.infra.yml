@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:5.18
+    container_name: geo_storage_neo4j
+    ports:
+      - "${NEO4J_EXTERNAL_HTTP_PORT}:7474"
+      - "${NEO4J_EXTERNAL_BOLT_PORT}:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_AUTH}
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+
+  minio:
+    image: pgsty/minio:latest
+    container_name: geo_storage_s3
+    ports:
+      - "${MINIO_EXTERNAL_API_PORT}:9000"
+      - "${MINIO_EXTERNAL_CONSOLE_PORT}:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: geo_storage_ollama
+    ports:
+      - "${OLLAMA_EXTERNAL_PORT}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+  minio_data:
+  ollama_data:
