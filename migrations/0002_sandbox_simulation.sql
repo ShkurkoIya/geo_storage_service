@@ -1,5 +1,5 @@
 -- =========================================================================
--- 🚀 МИГРАЦИЯ 0002: ВЫДЕЛЕННАЯ ФИЧА СИМУЛЯЦИОННОЙ ПЕСОЧНИЦЫ ПОД ГИНТЕЛЛ
+-- МИГРАЦИЯ 0002: СИМУЛЯЦИОННАЯ ПЕСОЧНИЦЫ ПОД ГИНТЕЛЛ
 -- =========================================================================
 
 CREATE SCHEMA IF NOT EXISTS sandbox_simulation;
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS sandbox_simulation.synthetic_ore_bodies (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Скважины Михалыча
+-- 2. Скважины
 CREATE TABLE IF NOT EXISTS sandbox_simulation.synthetic_drillholes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     body_id UUID REFERENCES sandbox_simulation.synthetic_ore_bodies(id) ON DELETE CASCADE,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS sandbox_simulation.synthetic_drillholes (
     geom_line geometry(LineStringZ, 4326)
 );
 
--- 3. Рекомендованные точки бурения ГКЗ С1
+-- 3. Рекомендованные точки бурения ГКЗ
 CREATE TABLE IF NOT EXISTS sandbox_simulation.recommended_gkz_proposals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     body_id UUID REFERENCES sandbox_simulation.synthetic_ore_bodies(id) ON DELETE CASCADE,
@@ -47,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_sim_ore_geom ON sandbox_simulation.synthetic_ore_
 CREATE INDEX IF NOT EXISTS idx_sim_dh_geom ON sandbox_simulation.synthetic_drillholes USING gist(geom_line);
 CREATE INDEX IF NOT EXISTS idx_sim_prop_geom ON sandbox_simulation.recommended_gkz_proposals USING gist(geom_point);
 
--- 4. 📦 БЛОЧНАЯ МОДЕЛЬ ЗАПАСОВ ГКЗ (3D КУБИКИ ДЛЯ ВИЗУАЛИЗАЦИИ)
+-- 4. БЛОЧНАЯ МОДЕЛЬ ЗАПАСОВ ГКЗ (3D КУБИКИ ДЛЯ ВИЗУАЛИЗАЦИИ)
 CREATE TABLE IF NOT EXISTS sandbox_simulation.synthetic_voxels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     body_id UUID REFERENCES sandbox_simulation.synthetic_ore_bodies(id) ON DELETE CASCADE,

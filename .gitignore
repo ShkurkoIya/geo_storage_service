@@ -1,5 +1,8 @@
 .zed
 .vscode
+.sqlx
 data/*json
 target/
 .env
+.sql_formatter.json
+.idea
