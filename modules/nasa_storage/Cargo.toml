@@ -1,0 +1,48 @@
+[package]
+name = "nasa_storage"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "nasa_storage"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nasa_storage_service"
+path = "src/main.rs"
+
+[dependencies]
+# Асинхронность и многопоточность
+tokio = { version = "1", features = ["full"] }
+
+# Базовый веб-сервер и макросы (версия синхронизирована с твоим space_analytics)
+axum = { version = "0.8.9", features = ["macros"] }
+
+# Работа с базой Postgres + интеграция типов
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "macros"] }
+
+# Сериализация и парсинг метаданных/ссылок
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Системное время с поддержкой таймзон и сериализации
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID для идентификации тасок в очереди download_tasks
+uuid = { version = "1", features = ["serde", "v4"] }
+
+# HTTP-клиент для выкачивания каналов (включаем потоковое скачивание)
+reqwest = { version = "0.12", features = ["stream", "json"] }
+
+# Официальный AWS SDK для отправки COG-растров в локальное S3 / MinIO
+aws-config = { version = "1.0" }
+aws-sdk-s3 = { version = "1.0" }
+
+# Локальная либа с общей логикой (твоя инфраструктура)
+geo_core = { path = "../../core" }
+geo-types = "0.7.20"
+config = "0.15.27"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+futures-util = "0.3.34"
+

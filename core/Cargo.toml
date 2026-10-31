@@ -8,13 +8,30 @@ name = "geo_core"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "uuid"] }
+futures-util = "0.3"
+bytes = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 proj = "0.27"
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
 thiserror = "2.0.21"
+reqwest = { version = "0.13.5", features = ["json", "stream", "query"] }
+reqwest-middleware = { version = "0.5.2", features = ["query"] }
+task-local-extensions = "0.1.4"
+ndarray = { version = "0.17.2", features = ["rayon"] }
+async-trait = "0.1.92"
+http = "1.5.0"
+geo-types = { version = "0.7.20", features = ["serde"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tiff = "0.11.3"
+chrono = "0.4.45"
 
 [dependencies.pyo3]
 version = "0.20"
 features = ["extension-module", "abi3-py37"]
 optional = true
+
+[[example]]
+name = "test_nasa_cmr"
+path = "src/nasa/examples/test_nasa_cmr.rs"

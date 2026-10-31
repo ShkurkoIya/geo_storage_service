@@ -1,12 +1,14 @@
 pub mod geodesy;
-pub mod models;
 
-pub use models::{
-    CalibrationResult, ControlPointPair, CoordinateSystemType, RawPoint, TransformationParameters,
-    UniversalCalibrationRequest,
+pub use geodesy::{
+    CalibrationError, CalibrationResult, ControlPointPair, CoordinateSystemType, GeoCalibrator,
+    RawPoint, TransformationParameters, UniversalCalibrationRequest, UniversalCalibrator,
 };
 
-pub use geodesy::{calibrator::GeoCalibrator, CalibrationError, UniversalCalibrator};
+pub mod infra;
+pub use infra::stream_processor::DbStreamProcessor;
+
+pub mod nasa;
 
 // #[cfg(feature = "extension-module")]
 // pub mod ffi;

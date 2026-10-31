@@ -4,23 +4,37 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["core"]
+members = [
+    "core",
+    "modules/space_analytics",
+    "modules/reference_geo",
+    "modules/core_storage", 
+    "modules/nasa_storage", 
+]
 
 [[bin]]
 name = "geo_storage_service"
 path = "src/main.rs"
 
 [dependencies]
-geo_core = { path = "./core" }
-tokio = { version = "1.35", features = ["full"] }
-axum = "0.7"
+axum = { version = "0.8.9", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "macros"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-serde_json = "1.0.151"
-geo-types = "0.7"
+serde_json = "1"
+futures-util = "0.3.34"
+tokio-util = { version = "0.7.20", features = ["io"] }
+dotenvy = "0.15"
+serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-geozero = { version = "0.11", features = ["with-postgis-sqlx", "with-wkb"] }
-dotenvy = "0.15.7"
-uuid = { version = "1.0", features = ["v4", "serde"] }
-serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+async-trait = "0.1.92"
+
+# Internal
+geo_core = { path = "./core" }
+reference_geo = { path = "./modules/reference_geo" }
+space_analytics = { path = "./modules/space_analytics" }
+core_storage = { path = "./modules/core_storage" }
+nasa_storage = { path = "./modules/nasa_storage" }
+

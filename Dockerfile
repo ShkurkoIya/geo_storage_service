@@ -4,6 +4,9 @@
 FROM rust:slim AS builder
 
 RUN apt-get update && apt-get install -y \
+    clang \
+    libclang-dev \
+    llvm-dev \
     pkg-config \
     libproj-dev \
     build-essential \

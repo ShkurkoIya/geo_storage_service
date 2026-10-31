@@ -1,6 +1,6 @@
 use super::{CalibrationError, UniversalCalibrator};
-use crate::models::{
-    CalibrationResult, CoordinateSystemType, RawPoint, TransformationParameters,
+use crate::geodesy::models::{
+    CalibrationResult, ControlPointPair, CoordinateSystemType, RawPoint, TransformationParameters,
     UniversalCalibrationRequest,
 };
 use proj::Proj;
@@ -233,7 +233,7 @@ impl GeoCalibrator {
     /// Вынос расчета СКО (RMSE)
     fn calculate_network_rmse(
         &self,
-        pts: &[crate::models::ControlPointPair],
+        pts: &[ControlPointPair],
         dx: f64,
         dy: f64,
         scale: f64,
@@ -267,7 +267,7 @@ mod tests {
     use std::matches;
 
     use super::*;
-    use crate::models::{ControlPointPair, CoordinateSystemType, RawPoint};
+    use crate::geodesy::models::{ControlPointPair, CoordinateSystemType, RawPoint};
 
     // =========================================================================
     // 1. ТЕСТЫ СТРАТЕГИИ Б (ХЕЛМЕРТ: МЕТРЫ <──> МЕТРЫ)

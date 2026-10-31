@@ -1,6 +1,11 @@
 pub mod calibrator;
+pub mod models;
 
-use crate::models::{CalibrationResult, UniversalCalibrationRequest};
+pub use calibrator::GeoCalibrator;
+pub use models::{
+    CalibrationResult, ControlPointPair, CoordinateSystemType, RawPoint, TransformationParameters,
+    UniversalCalibrationRequest,
+};
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum CalibrationError {
