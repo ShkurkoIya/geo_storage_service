@@ -26,7 +26,7 @@ CREATE TABLE nasa.collections (
 -- Таблица для хранения дампированных метаданных гранул (Обновленная)
 CREATE TABLE nasa.spatial_granules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nasa_granule_id VARCHAR(255) UNIQUE NOT NULL,
+    nasa_granule_id VARCHAR(255) NOT NULL,
     collection_concept_id VARCHAR(100) NOT NULL REFERENCES nasa.collections(concept_id),
     acquisition_date TIMESTAMP WITH TIME ZONE NOT NULL,
     cloud_cover REAL NOT NULL,

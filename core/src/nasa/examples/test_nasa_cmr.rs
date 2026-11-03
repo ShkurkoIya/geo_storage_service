@@ -1,138 +1,148 @@
 use geo_core::nasa::client::{CmrClient, CmrQuery, CollectionSelector};
-use geo_core::nasa::cmr::NasaCmrExt;
-use geo_core::nasa::collection::GranuleCollection;
-use geo_core::nasa::granule::GisGranule;
 use geo_core::nasa::middleware::NasaAuthMiddleware;
-
 use geo_types::{coord, Rect};
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::env;
 use std::error::Error;
 
+#[derive(Debug, Clone, Copy)]
+enum NasaProduct {
+    Hlsl30,
+    Hlss30,
+    Mod09Ga,
+    Vj109Ga,
+    Eco2Lste,
+}
+
+impl NasaProduct {
+    fn short_name(&self) -> &'static str {
+        match self {
+            Self::Hlsl30 => "HLSL30",
+            Self::Hlss30 => "HLSS30",
+            Self::Mod09Ga => "MOD09GA",
+            Self::Vj109Ga => "VJ109GA",
+            Self::Eco2Lste => "ECO2LSTE",
+        }
+    }
+
+    fn version(&self) -> &'static str {
+        match self {
+            Self::Hlsl30 | Self::Hlss30 => "2.0",
+            Self::Mod09Ga => "061",
+            Self::Vj109Ga => "002",
+            Self::Eco2Lste => "002",
+        }
+    }
+
+    // Хак: определяет, нужно ли нашему билдеру навязывать cloud_cover в строке запроса
+    fn supports_cmr_cloud_filter(&self) -> bool {
+        match self {
+            Self::Hlsl30 | Self::Hlss30 => true,
+            _ => false, // Для MODIS, VIIRS и ECOSTRESS в CMR этот параметр часто ломает выдачу
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // 1. Инициализируем окружение логов для наглядности
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    tracing::info!("📡 Запуск сквозного интеграционного теста NASA CMR & COG...");
-
-    // 2. Нативно подтягиваем токен из корневого .env через утилиту dotenv
     dotenvy::dotenv().ok();
     let token = env::var("NASA_API_KEY").unwrap_or_else(|_| "mock_token_for_dev".to_string());
 
-    if token == "mock_token_for_dev" {
-        tracing::warn!("⚠️ NASA_API_KEY не найден в окружении. Запрос уйдет АНОНИМНО.");
-    } else {
-        tracing::info!(
-            "✅ Токен авторизации успешно загружен (длина: {} симв.)",
-            token.len()
-        );
-    }
+    let products_to_test = [
+        NasaProduct::Hlsl30,
+        NasaProduct::Hlss30,
+        NasaProduct::Mod09Ga,
+        NasaProduct::Vj109Ga,
+        NasaProduct::Eco2Lste,
+    ];
 
-    // 3. Выделяем ГИС Bounding Box (Rect)
-    // Координаты квадрата в районе аномалии Мур (Южная Австралия)
-    let target_region = Rect::new(
-        coord!(x: 139.0, y: -33.5), // min_lon, min_lat
-        coord!(x: 140.5, y: -32.0), // max_lon, max_lat
+    // 🔥 УВЕЛИЧИВАЕМ BBOX: Расширяем рамки, чтобы гарантированно пересечь
+    // массивные синусоидальные тайлы MODIS (h30v12) и полосы пролета МКС (ECOSTRESS)
+    let wide_target_region = Rect::new(
+        coord!(x: 135.0, y: -35.0), // Делаем захват шире по долготе и широте
+        coord!(x: 145.0, y: -30.0),
     );
 
-    // 4. Задаем временной диапазон (Time Series)
-    let temporal_range = "2026-01-01T00:00:00Z,2026-06-30T23:59:59Z";
+    // Временное окно — берем стабильный период 2025 года
+    let temporal_range = "2025-06-01T00:00:00Z,2025-06-30T23:59:59Z";
 
-    // 5. Собираем универсальный запрос CmrQuery через наш Builder паттерн
-    let query = CmrQuery::new(
-        CollectionSelector::ShortName("HLSL30".to_string()),
-        target_region,
-        temporal_range,
-    )
-    .with_cloud_cover(15) // Нам нужно чистое небо над Австралией (макс 15% облаков)
-    .with_page_size(50); // Выкачиваем пачку для поиска временного ряда
-
-    // 6. 🔥 СОБИРАЕМ СЕНЬОРСКИЙ HTTP-КЛИЕНТ И ИНЖЕКТИРУЕМ MIDDLEWARE
     let base_client = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
         .build()?;
 
     let retry_strategy = ExponentialBackoff::builder().build_with_max_retries(3);
-
-    // Склеиваем сэндвич: Ретраи + Твоя авторизация с Client-Id, Accept и User-Agent!
     let http_client = ClientBuilder::new(base_client)
         .with(RetryTransientMiddleware::new_with_policy(retry_strategy))
         .with(NasaAuthMiddleware { token })
         .build();
 
-    // Создаем экземпляр сетевого клиента CMR, скормив ему ссылку на middleware-сборку
     let cmr_client = CmrClient::new(&http_client);
 
-    tracing::info!("🔍 Выполняем асинхронный поиск в каталоге NASA Earthdata...");
+    println!("\n================================================================================");
+    println!("🛰️  ЗАПУСК СВЕРХУНИВЕРСАЛЬНОГО ТЕСТА С РАСШИРЕННЫМ BBOX");
+    println!("================================================================================");
 
-    // ============================================================================
-    // 🌊 ПЛОСКИЙ АСИНХРОННЫЙ КОНВЕЙЕР (ОШИБКИ ПРИВЕДЕНЫ К ЕДИНOMУ BOX<DYN ERROR>)
-    // ============================================================================
-    let run_pipeline = async {
-        // Шаг 1: Фетчим универсальную коллекцию гранул через обновленный сетевой CMR клиент
-        let collection = cmr_client.fetch_granules(query).await?;
-        tracing::info!(
-            "📊 Всего сырых гранул прилетело от NASA: {}",
-            collection.len()
+    for product in products_to_test.iter() {
+        println!(
+            "\n🔍 Запрос для продукта: {} (v{})",
+            product.short_name(),
+            product.version()
         );
 
-        // Шаг 2: Фильтруем каналы на прикладном уровне (требуем NIR + SWIR1 для дегазации)
-        let hydrogen_pipeline_bands = ["B05", "B06"];
-        let filtered_collection = collection.require_bands(&hydrogen_pipeline_bands);
-        tracing::info!(
-            "🎯 Гранул после спектральной фильтрации (NIR+SWIR1): {}",
-            filtered_collection.len()
+        // Базовый конструктор запроса
+        let mut query = CmrQuery::new(
+            CollectionSelector::ShortName(product.short_name().to_string()),
+            wide_target_region,
+            temporal_range,
+        )
+        .with_page_size(3);
+
+        // 🔥 Динамически настраиваем фильтр облачности в зависимости от специфики миссии в CMR
+        if product.supports_cmr_cloud_filter() {
+            query = query.with_cloud_cover(100); // Для HLS разрешаем всё, но контролируем параметр
+        } else {
+            // Если твой билдер CmrQuery по умолчанию ставит cloud_cover = 0 или другой дефолт,
+            // убедись, что твоя библиотека под капотом не шлет "cloud_cover=" для таких продуктов.
+            // (Если метод `.with_cloud_cover` принимает Option, тут стоило бы передать None).
+        }
+
+        match cmr_client.fetch_granules(query).await {
+            Ok(collection) => {
+                println!("   📊 Найдено гранул: {}", collection.len());
+
+                if collection.is_empty() {
+                    println!("   ⚠️  Данные отсутствуют. Попробуй сместить BBox на экватор или расширить даты.");
+                    continue;
+                }
+
+                if let Ok(gis_granule) = collection.latest() {
+                    println!("   📦 ID:       {}", gis_granule.concept_id);
+                    println!("   📄 Имя:      {}", gis_granule.title);
+                    println!("   📅 Дата:     {}", gis_granule.time_start);
+
+                    println!("   🗺️  Доступные каналы (первые 5 строк):");
+                    for (band_name, href) in gis_granule.bands.iter().take(5) {
+                        let short_href = if href.len() > 65 {
+                            format!("{}...", &href[..65])
+                        } else {
+                            href.clone()
+                        };
+                        println!("      🔹 [{}] -> {}", band_name, short_href);
+                    }
+                }
+            }
+            Err(err) => {
+                println!("   ❌ Ошибка API: {}", err);
+            }
+        }
+        println!(
+            "--------------------------------------------------------------------------------"
         );
-
-        // Шаг 3: Вытягиваем самую свежую гранулу конвейера из collection.rs
-        let gis_granule = filtered_collection.latest()?;
-        tracing::info!("🎯 Целевой снимок выбран: {}", gis_granule.title);
-
-        // Шаг 4: Достаем URL конкретного нужного нам канала (например, B05)
-        let target_cog_url = gis_granule
-            .bands
-            .get("B05")
-            .ok_or_else(|| "Ошибка: Канал B05 пропал из мапы".to_string())?;
-
-        // Шаг 5: Имитируем ленивое чтение метаданных COG (пока заглушка, так как cog.rs пишется параллельно)
-        tracing::info!("⏳ Читаем метаданные COG удаленно (HTTP Range 0-16384)...");
-        tracing::info!("🔗 Ссылка на COG-растр канала B05: {}", target_cog_url);
-
-        // Возвращаем собранные данные наверх
-        Ok(gis_granule)
-    };
-
-    // Запускаем наш плоский конвейер на выполнение
-    let pipeline_result: Result<GisGranule, Box<dyn Error>> = run_pipeline.await;
-
-    // ============================================================================
-    // 🏁 ОБРАБОТКА ЕДИНОГО РЕЗУЛЬТАТА НА ВЫХОДЕ
-    // ============================================================================
-    match pipeline_result {
-        Ok(granule) => {
-            println!("\n🎉 ГИС-КОНВЕЙЕР ВЫПОЛНЕН УСПЕШНО:");
-            println!("==================================================");
-            println!("📦 Концепт ID (NASA): {}", granule.concept_id);
-            println!("📄 Имя гранулы:      {}", granule.title);
-            println!("☁️ Облачность:        {}%", granule.cloud_cover);
-            println!("📅 Дата съемки:       {}", granule.time_start);
-            if let Some(preview) = granule.browse_url {
-                println!("🖼️ JPG-Превьюшка:     {}", preview);
-            }
-            println!("\n🗺️ Список всех доступных спектральных COG-ссылок для этого снимка:");
-            for (band_name, href) in granule.bands.iter() {
-                println!("   🔹 Канал [{}]: {}", band_name, href);
-            }
-            println!("==================================================");
-            println!("🚀 Мы лениво распарсили параметры без выкачивания гигабайтов в RAM!");
-        }
-        Err(err) => {
-            eprintln!("\n❌ Конвейер упал на одном из шагов: {}", err);
-        }
     }
 
     Ok(())

@@ -2,9 +2,11 @@ pub mod client;
 pub mod cmr;
 pub mod cog;
 pub mod collection;
+pub mod extractor;
 pub mod granule;
 pub mod middleware;
 pub mod models;
+pub mod product;
 pub mod utils;
 
 use middleware::NasaAuthMiddleware;
