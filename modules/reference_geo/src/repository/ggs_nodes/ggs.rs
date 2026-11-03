@@ -30,6 +30,7 @@ impl<'a> GgsNodesRepository<'a> {
     pub async fn find_ggs_by_id(&self, id: i32) -> Result<Option<GgsNodeDomain>, sqlx::Error> {
         let row = sqlx::query_as!(
                GgsNodeRow,
+               /* sql */
                r#"
                SELECT id, node_index, name, accuracy_class, map_sheet_50k, map_sheet_200k, height_system,
                       height_determination_method, leveling_type, monument_mark, center_structure_type,

@@ -25,7 +25,13 @@ http = "1.5.0"
 geo-types = { version = "0.7.20", features = ["serde"] }
 tokio = { version = "1.54.1", features = ["full"] }
 tiff = "0.11.3"
-chrono = "0.4.45"
+chrono = { version = "0.4.45", features = ["serde"] }
+geo = "0.33.1"
+reqwest-retry = "0.9.1"
+dotenvy = "0.15.7"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+serde-aux = "4.7.0"
 
 [dependencies.pyo3]
 version = "0.20"

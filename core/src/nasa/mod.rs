@@ -1,12 +1,16 @@
+pub mod client;
 pub mod cmr;
 pub mod cog;
+pub mod collection;
+pub mod granule;
 pub mod middleware;
+pub mod models;
 pub mod utils;
 
 use middleware::NasaAuthMiddleware;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 
-pub use cmr::CmrClient;
+pub use client::CmrClient;
 pub use cog::CogClient;
 
 #[derive(Clone)]

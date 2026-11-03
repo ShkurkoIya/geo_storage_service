@@ -23,19 +23,26 @@ CREATE TABLE nasa.collections (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Таблица для хранения дампированных метаданных гранул
+-- Таблица для хранения дампированных метаданных гранул (Обновленная)
 CREATE TABLE nasa.spatial_granules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nasa_granule_id VARCHAR(255) UNIQUE NOT NULL,
-    collection_concept_id VARCHAR(100) NOT NULL,
+    collection_concept_id VARCHAR(100) NOT NULL REFERENCES nasa.collections(concept_id),
     acquisition_date TIMESTAMP WITH TIME ZONE NOT NULL,
     cloud_cover REAL NOT NULL,
-
-    -- Геопространственный полигон (footprint) снимка в WGS84
     footprint geometry(Polygon, 4326) NOT NULL,
 
-    -- JSONB-карта вида {"B5": "https://...", "B6": "https://...", "QA": "https://..."}
-    band_urls JSONB NOT NULL,
+    -- Сюда пишем все HTTPS ссылки: 
+    -- Для HLS:    {"B01": "https://...", "B02": "https://...", "Fmask": "https://..."}
+    -- Для MODIS:  {"hdf": "https://...", "opendap": "https://...", "xml": "https://..."}
+    band_urls JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    -- То же самое, но для протокола S3 (на случай если воркер в AWS us-west-2):
+    -- {"hdf": "s3://...", "B01": "s3://..."}
+    s3_urls JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    -- Ссылка на дефолтную JPG-превьюшку (из rel: .../browse#)
+    browse_url TEXT,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
