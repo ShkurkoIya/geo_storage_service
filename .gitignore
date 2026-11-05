@@ -7,3 +7,4 @@ target/
 .sql_formatter.json
 .idea
 .geo_analytics/.venv/
+.scripts/.venv
