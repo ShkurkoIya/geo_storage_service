@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use geo_types::Polygon;
 
+use crate::nasa::{extractor::CmrLinkParser, product::NasaProduct};
+
 use super::cmr::CmrEntry;
 
 #[derive(Debug, Clone)]
@@ -50,10 +52,8 @@ pub struct GisGranule {
 }
 
 impl GisGranule {
-    pub fn from_cmr_entry(entry: CmrEntry) -> Option<Self> {
-        if entry.parsed_links.bands.is_empty() {
-            return None;
-        }
+    pub fn from_cmr_entry(entry: CmrEntry, active_product: NasaProduct) -> Option<Self> {
+        let (bands, s3_links, browse_url) = active_product.parse_links(&entry.raw_links);
 
         Some(Self {
             concept_id: entry.id,
@@ -64,9 +64,9 @@ impl GisGranule {
             granule_size_mb: entry.granule_size,
             cloud_cover: entry.cloud_cover.unwrap_or(0.0),
             geometry: entry.polygons,
-            bands: entry.parsed_links.bands,
-            s3_links: entry.parsed_links.s3_links,
-            browse_url: entry.parsed_links.browse_url,
+            bands,
+            s3_links,
+            browse_url,
         })
     }
 

@@ -1,85 +1,184 @@
 use crate::nasa::product::NasaProduct;
+use crate::nasa::product::StorageFormat; // Импортируем наш обновленный энам форматов
 use std::collections::HashMap;
 
 /// Вспомогательная структура для десериализации ссылок из JSON/Atom ответов NASA CMR.
-/// Сюда Serde маппит массив "links" из ответа API.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct RawCmrLink {
+    pub rel: String,
     pub href: String,
     pub title: Option<String>,
 }
 
-/// Трейт, расширяющий функционал NasaProduct для каноничного парсинга бэндов.
+/// Трейт, расширяющий функционал NasaProduct для каноничного парсинга бэндов под все форматы данных.
 pub trait CmrLinkParser {
-    fn parse_links(&self, raw_links: &[RawCmrLink]) -> HashMap<String, String>;
+    fn parse_links(
+        &self,
+        raw_links: &[RawCmrLink],
+    ) -> (
+        HashMap<String, String>,
+        HashMap<String, String>,
+        Option<String>,
+    );
 }
 
 impl CmrLinkParser for NasaProduct {
-    fn parse_links(&self, raw_links: &[RawCmrLink]) -> HashMap<String, String> {
-        let mut assets = HashMap::new();
+    /// Возвращает кортеж: (Bands/Data_links, S3_links, Browse_url)
+    fn parse_links(
+        &self,
+        raw_links: &[RawCmrLink],
+    ) -> (
+        HashMap<String, String>,
+        HashMap<String, String>,
+        Option<String>,
+    ) {
+        let mut bands = HashMap::new();
+        let mut s3_links = HashMap::new();
+        let mut browse_url = None;
 
-        match self {
-            // =================================================================
-            // СТРАТЕГИЯ 1: CLOUD OPTIMIZED GEOTIFF (Каждый канал — отдельный файл)
-            // =================================================================
-            Self::Hlsl30 | Self::Hlss30 | Self::Hlsl30Vi | Self::Hss30Vi => {
-                for link in raw_links {
-                    let href = &link.href;
+        // Определяем физический формат хранения продукта один раз перед циклом
+        let format = self.storage_format();
 
-                    if href.ends_with(".tif") || href.ends_with(".tiff") {
-                        // Извлекаем чистый токен канала (например, "...v2.0.B05.tif" -> "B05")
-                        if let Some(band_name) = parse_hls_band_name(href) {
-                            assets.insert(band_name, href.clone());
-                        }
-                    } else if is_preview_link(href) {
-                        assets.insert("preview".to_string(), href.clone());
-                    } else if href.contains("s3credentials") {
-                        assets.insert("s3_credentials_api".to_string(), href.clone());
-                    }
+        for link in raw_links {
+            let href_lower = link.href.to_lowercase();
+            let rel_lower = link.rel.to_lowercase();
+
+            // Проверяем, не нативная ли это облачная S3 ссылка (AWS бакет)
+            let is_s3 = rel_lower.contains("esipfed.org") || link.href.starts_with("s3://");
+
+            // --- Шаг А: Отлавливаем превьюшки миссии (JPG/PNG) ---
+            if is_preview_link(&href_lower, &rel_lower) {
+                if browse_url.is_none() && link.href.starts_with("https://") {
+                    browse_url = Some(link.href.clone());
                 }
+                continue; // Превью обработано, идем дальше
             }
 
-            // =================================================================
-            // СТРАТЕГИЯ 2: МОНОЛИТНЫЕ КОНТЕЙНЕРЫ (Все каналы внутри одного файла)
-            // =================================================================
-            Self::Mod09Ga | Self::Myd09Ga | Self::Vj109Ga | Self::Eco2Lste | Self::EmitL2ARefl => {
-                for link in raw_links {
-                    let href = &link.href;
+            // --- Шаг Б: Динамический роутинг ссылок под ВСЕ форматы хранения ---
+            match format {
+                // 1. Облачные поканальные растры (HLS продукты)
+                StorageFormat::Cog => {
+                    if href_lower.contains(".tif") || href_lower.contains(".tiff") {
+                        if let Some(band_name) = parse_hls_band_name(&link.href) {
+                            if is_s3 {
+                                s3_links.insert(band_name, link.href.clone());
+                            } else {
+                                bands.insert(band_name, link.href.clone());
+                            }
+                        }
+                    }
+                }
 
-                    if href.ends_with(".hdf") || href.ends_with(".h5") || href.ends_with(".nc") {
-                        // Вместо динамических мусорных таймштампов жестко фиксируем ключ дата-куба
-                        assets.insert("data_cube".to_string(), href.clone());
-                    } else if href.ends_with(".xml") {
-                        assets.insert("metadata_xml".to_string(), href.clone());
-                    } else if is_preview_link(href) {
-                        assets.insert("preview".to_string(), href.clone());
-                    } else if href.contains("s3credentials") {
-                        assets.insert("s3_credentials_api".to_string(), href.clone());
+                // 2. Классические тяжелые GeoTIFF (например, NASADEM, ASTER GED)
+                StorageFormat::GeoTiff => {
+                    if href_lower.contains(".tif") || href_lower.contains(".tiff") {
+                        if is_s3 {
+                            s3_links.insert("geotiff_raster".to_string(), link.href.clone());
+                        } else {
+                            bands.insert("geotiff_raster".to_string(), link.href.clone());
+                        }
+                    } else if href_lower.contains(".xml") || href_lower.contains(".met") {
+                        if !is_s3 {
+                            bands.insert("metadata_xml".to_string(), link.href.clone());
+                        }
+                    }
+                }
+
+                // 3. Многомерные монолитные архивы-матрицы (MODIS, VIIRS, ECOSTRESS)
+                StorageFormat::Hdf => {
+                    if href_lower.contains(".hdf")
+                        || href_lower.contains(".h5")
+                        || href_lower.contains(".he5")
+                    {
+                        if is_s3 {
+                            s3_links.insert("data_cube".to_string(), link.href.clone());
+                        } else {
+                            bands.insert("data_cube".to_string(), link.href.clone());
+                        }
+                    } else if href_lower.contains(".xml") || href_lower.contains(".met") {
+                        if !is_s3 {
+                            bands.insert("metadata_xml".to_string(), link.href.clone());
+                        }
+                    }
+                }
+
+                // 4. Плотные спектральные кубы нового поколения (EMIT миссия)
+                StorageFormat::NetCdf => {
+                    if href_lower.contains(".nc") || href_lower.contains(".nc4") {
+                        if is_s3 {
+                            s3_links.insert("data_cube".to_string(), link.href.clone());
+                        } else {
+                            bands.insert("data_cube".to_string(), link.href.clone());
+                        }
+                    } else if href_lower.contains(".xml") {
+                        if !is_s3 {
+                            bands.insert("metadata_xml".to_string(), link.href.clone());
+                        }
+                    }
+                }
+
+                // 5. Векторные ГИС слои и треки (Shapefile, GeoJSON, KML, таблицы выработок CSV)
+                StorageFormat::Vector => {
+                    if href_lower.contains(".json") || href_lower.contains(".geojson") {
+                        bands.insert("geojson_vector".to_string(), link.href.clone());
+                    } else if href_lower.contains(".kml") || href_lower.contains(".kmz") {
+                        bands.insert("kml_vector".to_string(), link.href.clone());
+                    } else if href_lower.contains(".zip") {
+                        // NASA часто пакует ESRI Shapefile слои в .zip архивы
+                        bands.insert("shp_zip_container".to_string(), link.href.clone());
+                    } else if href_lower.contains(".csv") {
+                        bands.insert("csv_table".to_string(), link.href.clone());
+                    }
+                }
+
+                // 6. Метеорологические и атмосферные сетки (миссии осадков GPM, модели MERRA-2)
+                StorageFormat::Grib => {
+                    if href_lower.contains(".grb")
+                        || href_lower.contains(".grib")
+                        || href_lower.contains(".grib2")
+                    {
+                        if is_s3 {
+                            s3_links.insert("grib_met_grid".to_string(), link.href.clone());
+                        } else {
+                            bands.insert("grib_met_grid".to_string(), link.href.clone());
+                        }
+                    }
+                }
+
+                // 7. Сценарий-предохранитель для сырых бинарников, ASCII логов и прочих текстовых файлов качества
+                StorageFormat::Other => {
+                    if href_lower.contains(".txt")
+                        || href_lower.contains(".asc")
+                        || href_lower.contains(".bin")
+                    {
+                        if !is_s3 {
+                            let ext = link
+                                .href
+                                .split('.')
+                                .next_back()
+                                .unwrap_or("raw")
+                                .to_string();
+                            bands.insert(format!("raw_{}_file", ext), link.href.clone());
+                        }
                     }
                 }
             }
         }
 
-        assets
+        (bands, s3_links, browse_url)
     }
 }
 
 // ============================================================================
-// ВНУТРЕННИЕ ИЗОЛИРОВАННЫЕ ХЕЛПЕРЫ (ПРИВАТНЫЕ ДЛЯ МОДУЛЯ)
+// ВНУТРЕННИЕ ИЗОЛИРОВАННЫЕ ХЕЛПЕРЫ
 // ============================================================================
 
-/// Логика безопасного вычленения бэнда из HLS-ссылки.
-/// Пример строки: "https://.../HLS.L30.T54HUJ.2025176T002639.v2.0.B05.tif"
 fn parse_hls_band_name(url: &str) -> Option<String> {
-    let parts: Vec<&str> = url.split('.').collect();
+    let clean_url = url.split('?').next()?;
+    let parts: Vec<&str> = clean_url.split('.').collect();
     if parts.len() >= 2 {
-        let band_part = parts[parts.len() - 2]; // Предпоследний элемент перед расширением файла
-
-        // Приводим к верхнему регистру для единообразия в базе (Fmask -> FMASK, b01 -> B01)
+        let band_part = parts[parts.len() - 2];
         let normalized = band_part.to_uppercase();
-
-        // Дополнительный предохранитель: если кусок слишком длинный (например, NASA изменило структуру URL),
-        // мы не пишем мусор в имя бэнда. Имя канала у HLS всегда короткое (до 8 символов).
         if normalized.len() <= 8 {
             Some(normalized)
         } else {
@@ -90,10 +189,10 @@ fn parse_hls_band_name(url: &str) -> Option<String> {
     }
 }
 
-/// Универсальный маркер превью-ссылок
-fn is_preview_link(url: &str) -> bool {
-    url.ends_with(".jpg")
-        || url.ends_with(".jpeg")
-        || url.ends_with(".png")
-        || url.contains("browse")
+fn is_preview_link(href_lower: &str, rel_lower: &str) -> bool {
+    rel_lower.contains("browse#")
+        || href_lower.contains("browse")
+        || href_lower.ends_with(".jpg")
+        || href_lower.ends_with(".jpeg")
+        || href_lower.ends_with(".png")
 }

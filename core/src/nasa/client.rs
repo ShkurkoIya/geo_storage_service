@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use super::cmr::{CmrResponse, NasaCmrExt};
-use crate::nasa::collection::GranuleCollection;
+use crate::nasa::{collection::GranuleCollection, product::NasaProduct};
 use geo_types::Rect;
 use http::header::{ACCEPT, USER_AGENT};
 use reqwest_middleware::ClientWithMiddleware;
@@ -105,6 +107,13 @@ impl<'a> CmrClient<'a> {
             )
         })?;
 
-        Ok(cmr_data.into_collection())
+        let short_name_str = match &query.selector {
+            CollectionSelector::ShortName(name) => name.as_str(),
+            _ => "HLSL30",
+        };
+
+        let active_product = NasaProduct::from_str(short_name_str).unwrap_or(NasaProduct::Hlsl30);
+
+        Ok(cmr_data.into_collection(active_product))
     }
 }

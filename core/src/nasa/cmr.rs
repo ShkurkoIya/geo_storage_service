@@ -1,6 +1,8 @@
 use super::utils::extract_band_name;
 use crate::nasa::collection::GranuleCollection;
+use crate::nasa::extractor::{CmrLinkParser, RawCmrLink};
 use crate::nasa::granule::GisGranule;
+use crate::nasa::product::NasaProduct;
 
 use chrono::{DateTime, Utc};
 use geo_types::{Polygon, Rect};
@@ -89,69 +91,12 @@ pub struct ParsedCmrLinks {
     pub browse_url: Option<String>,
 }
 
-fn deserialize_nasa_links<'de, D>(deserializer: D) -> Result<ParsedCmrLinks, D::Error>
+fn deserialize_nasa_links<'de, D>(deserializer: D) -> Result<Vec<RawCmrLink>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    struct RawLink {
-        rel: String,
-        href: String,
-    }
-
-    let raw_links: Vec<RawLink> = Deserialize::deserialize(deserializer)?;
-    let junk_extensions = [".xml", ".json", ".txt", ".md5"];
-
-    let (bands, s3_links, browse_url) = raw_links.into_iter().fold(
-        (HashMap::new(), HashMap::new(), None),
-        |(mut bands_acc, mut s3_acc, mut browse_acc), link| {
-            let rel_lower = link.rel.to_lowercase();
-            let href_lower = link.href.to_lowercase();
-
-            // Это дефолтная JPG превьюшка из rel: .../browse#
-            if rel_lower.contains("browse#")
-                && (href_lower.ends_with(".jpg") || href_lower.ends_with(".jpeg"))
-            {
-                if browse_acc.is_none() && link.href.starts_with("https://") {
-                    browse_acc = Some(link.href);
-                }
-            }
-            // Это целевой спектральный HTTPS канал растра
-            else if rel_lower.contains("data#")
-                && link.href.starts_with("https://")
-                && !junk_extensions
-                    .iter()
-                    .any(|junk| href_lower.ends_with(junk))
-            {
-                let key = extract_band_name(&link.href).unwrap_or_else(|| {
-                    link.href
-                        .split('.')
-                        .next_back()
-                        .unwrap_or("UNKNOWN")
-                        .to_uppercase()
-                });
-                bands_acc.insert(key, link.href);
-            }
-            // Сценарий В: Это нативная облачная S3-ссылка
-            else if link.rel == "http://esipfed.org" {
-                let ext = link
-                    .href
-                    .split('.')
-                    .next_back()
-                    .unwrap_or("UNKNOWN")
-                    .to_uppercase();
-                s3_acc.insert(ext, link.href);
-            }
-
-            (bands_acc, s3_acc, browse_acc)
-        },
-    );
-
-    Ok(ParsedCmrLinks {
-        bands,
-        s3_links,
-        browse_url,
-    })
+    let raw_links: Vec<RawCmrLink> = Deserialize::deserialize(deserializer)?;
+    Ok(raw_links)
 }
 
 fn deserialize_cmr_geometry<'de, D>(deserializer: D) -> Result<Option<Polygon<f64>>, D::Error>
@@ -200,34 +145,16 @@ pub struct CmrEntry {
     pub polygons: Option<Polygon<f64>>,
 
     #[serde(rename = "links", deserialize_with = "deserialize_nasa_links")]
-    pub parsed_links: ParsedCmrLinks,
+    pub raw_links: Vec<RawCmrLink>,
 }
 
 impl CmrResponse {
-    pub fn into_collection(self) -> GranuleCollection {
+    pub fn into_collection(self, active_product: NasaProduct) -> GranuleCollection {
         let target_granules: Vec<GisGranule> = self
             .feed
             .entry
             .into_iter()
-            .filter_map(|entry| {
-                if entry.parsed_links.bands.is_empty() {
-                    return None;
-                }
-
-                Some(GisGranule {
-                    concept_id: entry.id,
-                    title: entry.title,
-                    collection_concept_id: entry.collection_concept_id,
-                    time_start: entry.time_start,
-                    time_end: entry.time_end,
-                    granule_size_mb: entry.granule_size,
-                    cloud_cover: entry.cloud_cover.unwrap_or(0.0),
-                    geometry: entry.polygons,
-                    bands: entry.parsed_links.bands,
-                    s3_links: entry.parsed_links.s3_links,
-                    browse_url: entry.parsed_links.browse_url,
-                })
-            })
+            .filter_map(|entry| GisGranule::from_cmr_entry(entry, active_product))
             .collect();
 
         GranuleCollection {

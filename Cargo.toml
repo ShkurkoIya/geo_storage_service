@@ -37,4 +37,5 @@ reference_geo = { path = "./modules/reference_geo" }
 space_analytics = { path = "./modules/space_analytics" }
 core_storage = { path = "./modules/core_storage" }
 nasa_storage = { path = "./modules/nasa_storage" }
+gdal = { version = "0.19.0", features = ["bindgen"] }
 

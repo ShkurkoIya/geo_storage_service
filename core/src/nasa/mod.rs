@@ -1,6 +1,7 @@
 pub mod client;
 pub mod cmr;
 pub mod cog;
+pub mod cog_analyzer;
 pub mod collection;
 pub mod extractor;
 pub mod granule;
