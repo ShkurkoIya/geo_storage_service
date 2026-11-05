@@ -32,7 +32,8 @@ dotenvy = "0.15.7"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 serde-aux = "4.7.0"
-gdal = { version = "0.19.0", features = ["bindgen"] }
+terrio = { version = "0.7.0" }
+geojson = "1.0.0"
 
 [dependencies.pyo3]
 version = "0.20"
@@ -42,3 +43,7 @@ optional = true
 [[example]]
 name = "test_nasa_cmr"
 path = "src/nasa/examples/test_nasa_cmr.rs"
+
+[[example]]
+name = "hydrogen_example"
+path = "src/nasa/examples/hydrogen_example.rs"
